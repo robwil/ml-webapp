@@ -4,9 +4,9 @@
 
 This will hold a webapp that serves various ML models to the web.
 
-## TODO
+## Models
 
-Right now the Dockerfile pulls in `fastai` (and doing so requires using the full Starlette base image, instead of the alpine one), but that has a crazy amount of dependencies. This leads to a Docker image of 4GB :( Ideally, I want to figure out how to run these models in a lighter weight form, but it's fine for now in this POC.
+The pet classifier model is trained in (this notebook)[https://github.com/robwil/fastai-deeplearning/blob/master/Pet_Classification.ipynb] using FastAI's wrapping of PyTorch. The PyTorch model is exported as an ONNX model because it has less runtime dependencies than PyTorch and/or FastAI (1.5GB docker image vs. 4.5GB).
 
 ## Deployment
 

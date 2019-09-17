@@ -1,11 +1,17 @@
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, HTMLResponse
-from fastai.vision import *
+from io import BytesIO
 import aiohttp
+import onnxruntime
+import skimage
+import warnings
+import PIL
+import numpy as np
 
 app = Starlette()
-pet_learner = load_learner('/app/models/pet')
-
+session = onnxruntime.InferenceSession("/app/models/pet/pet.onnx")
+data_classes = ['Abyssinian', 'Bengal', 'Birman', 'Bombay', 'British_Shorthair', 'Egyptian_Mau', 'Maine_Coon', 'Persian', 'Ragdoll', 'Russian_Blue', 'Siamese', 'Sphynx', 'american_bulldog', 'american_pit_bull_terrier', 'basset_hound', 'beagle', 'boxer', 'chihuahua', 'english_cocker_spaniel', 'english_setter', 'finnish_lapphund', 'german_shorthaired', 'great_pyrenees', 'havanese', 'japanese_chin', 'keeshond', 'leonberger', 'miniature_pinscher', 'newfoundland', 'pomeranian', 'pug', 'saint_bernard', 'samoyed', 'scottish_terrier', 'shiba_inu', 'staffordshire_bull_terrier', 'wheaten_terrier', 'yorkshire_terrier']
+imagenet_stats = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
 @app.route("/")
 def form(request):
@@ -85,16 +91,18 @@ async def classify_url(request):
 
 
 def predict_image_from_bytes(bytes):
-    img = open_image(BytesIO(bytes))
-    classes = pet_learner.data.classes
-    _, class_, losses = pet_learner.predict(img)
+    img = my_open_image(BytesIO(bytes))
+    normalized_img = my_normalize(img, np.array(imagenet_stats[0]), np.array(imagenet_stats[1]))
+    numpy_input = normalized_img[None, ...]
+    resized_image = skimage.transform.rescale(numpy_input, [1, 1, 244/numpy_input.shape[2], 244/numpy_input.shape[3]])
+
+    input_name = session.get_inputs()[0].name 
+    output_name = session.get_outputs()[0].name
+    results = session.run([output_name], {input_name: resized_image})
+    data_classes
     return JSONResponse({
-        "prediction": classes[class_.item()],
-        "scores": sorted(
-            zip(classes, map(float, losses)),
-            key=lambda p: p[1],
-            reverse=True
-        )
+        'prediction': data_classes[np.argmax(results)],
+        'scores': sorted(zip(data_classes, map(float, results[0][0])),key=lambda p: p[1],reverse=True),
     })
 
 
@@ -102,3 +110,18 @@ async def get_bytes(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             return await response.read()
+
+def my_open_image(fn):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning) # EXIF warning from TiffPlugin
+        x = PIL.Image.open(fn).convert('RGB')
+    a = np.asarray(x)
+    if a.ndim==2 : a = np.expand_dims(a,2)
+    a = np.transpose(a, (1, 0, 2))
+    a = np.transpose(a, (2, 1, 0))
+    x = a.astype(np.float32, copy=False)
+    x = x / 255
+    return x
+
+def my_normalize(x, mean, std):
+  return ((x-mean[...,None,None]) / std[...,None,None]).astype(np.float32, copy=False)
