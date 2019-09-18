@@ -7,11 +7,31 @@ import skimage
 import warnings
 import PIL
 import numpy as np
+from typing import List
+
 
 app = Starlette()
-session = onnxruntime.InferenceSession("/app/models/pet/pet.onnx")
-data_classes = ['Abyssinian', 'Bengal', 'Birman', 'Bombay', 'British_Shorthair', 'Egyptian_Mau', 'Maine_Coon', 'Persian', 'Ragdoll', 'Russian_Blue', 'Siamese', 'Sphynx', 'american_bulldog', 'american_pit_bull_terrier', 'basset_hound', 'beagle', 'boxer', 'chihuahua', 'english_cocker_spaniel', 'english_setter', 'finnish_lapphund', 'german_shorthaired', 'great_pyrenees', 'havanese', 'japanese_chin', 'keeshond', 'leonberger', 'miniature_pinscher', 'newfoundland', 'pomeranian', 'pug', 'saint_bernard', 'samoyed', 'scottish_terrier', 'shiba_inu', 'staffordshire_bull_terrier', 'wheaten_terrier', 'yorkshire_terrier']
+
 imagenet_stats = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+class Model:
+    session: onnxruntime.InferenceSession
+    classes: List[str]
+    def __init__(self, session: onnxruntime.InferenceSession, classes: List[str]) -> None:
+        self.session = session
+        self.classes = classes
+
+models = {
+    'pet': Model(
+        onnxruntime.InferenceSession("/app/models/pet.onnx"),
+        ['Abyssinian', 'Bengal', 'Birman', 'Bombay', 'British_Shorthair', 'Egyptian_Mau', 'Maine_Coon', 'Persian', 'Ragdoll', 'Russian_Blue', 'Siamese', 'Sphynx', 'american_bulldog', 'american_pit_bull_terrier', 'basset_hound', 'beagle', 'boxer', 'chihuahua', 'english_cocker_spaniel', 'english_setter', 'finnish_lapphund', 'german_shorthaired', 'great_pyrenees', 'havanese', 'japanese_chin', 'keeshond', 'leonberger', 'miniature_pinscher', 'newfoundland', 'pomeranian', 'pug', 'saint_bernard', 'samoyed', 'scottish_terrier', 'shiba_inu', 'staffordshire_bull_terrier', 'wheaten_terrier', 'yorkshire_terrier']
+    ),
+    'flower': Model(
+        onnxruntime.InferenceSession("/app/models/pet.onnx"),
+        ['Alpine Sea Holly', 'Anthurium', 'Artichoke', 'Azalea', 'Ball Moss', 'Balloon Flower', 'Barbeton Daisy', 'Bearded Iris', 'Bee Balm', 'Bird of Paradise', 'Bishop of Llandaff', 'Black-eyed Susan', 'Blackberry Lily', 'Blanket Flower', 'Bolero Deep Blue', 'Bougainvillea', 'Bromelia', 'Buttercup', 'Californian Poppy', 'Camellia', 'Canna Lily', 'Canterbury Bells', 'Cape Flower', 'Carnation', 'Cautleya Spicata', 'Clematis', "Colt's Foot", 'Columbine', 'Common Dandelion', 'Corn Poppy', 'Cyclamen', 'Daffodil', 'Desert-rose', 'English Marigold', 'Fire Lily (Glory Lily)', 'Foxglove', 'Frangipani', 'Fritillary', 'Garden Phlox', 'Gaura', 'Gazania', 'Geranium', 'Giant White Arum Lily', 'Globe Thistle', 'Globe-Flower', 'Grape Hyacinth', 'Great Masterwort', 'Hard-leaved Pocket Orchid', 'Hibiscus', 'Hippeastrum', 'Japanese Anemone', 'King Protea', 'Lenten Rose', 'Lotus', 'Love in the Mist', 'Magnolia', 'Mallow', 'Marigold', 'Mexican Aster', 'Mexican Petunia', 'Monkshood', 'Moon Orchid', 'Morning Glory', 'Orange Dahlia', 'Osteospermum', 'Oxeye Daisy', 'Passion Flower', 'Pelargonium', 'Peruvian Lily', 'Petunia', 'Pincushion Flower', 'Pink Primrose', 'Pink-yellow Dahlia', 'Poinsettia', 'Primula', "Prince of Wales' Feathers", 'Purple Coneflower', 'Red Ginger', 'Rose', 'Ruby-lipped Cattleya', 'Siam Tulip', 'Silverbush', 'Snapdragon', 'Spear Thistle', 'Spring Crocus', 'Stemless Gentian', 'Sunflower', 'Sweet Pea', 'Sweet William', 'Sword Lily', 'Thorn Apple', 'Tiger Lily', 'Toad Lily', 'Tree Mallow', 'Tree Poppy', 'Trumpet Creeper', 'Wallflower', 'Water Lily', 'Watercress', 'Wild Pansy', 'Windflower', 'Yellow Iris']
+    )
+}
+
 
 @app.route("/")
 def form(request):
@@ -31,13 +51,25 @@ def form(request):
             <div class="section flow-text">
                 <form class="file-form" action="/upload" method="post" enctype="multipart/form-data">
                     Select image to upload:
-                    <input type="file" name="file">
-                    <input type="submit" value="Upload Image">
+                        <div class="file-field input-field">
+                            <div class="btn">
+                                <span>File</span>
+                                <input type="file" name="file">
+                            </div>
+                            <div class="file-path-wrapper">
+                                <input class="file-path validate" type="text">
+                            </div>
+                        </div>
+                    <button class="btn waves-effect waves-light" type="submit" name="action">
+                        Upload     <i class="material-icons right">add_a_photo</i>
+                    </button>
                 </form>
                 Or submit a URL:
                 <form class="url-form" action="/classify-url" method="get">
                     <input type="url" name="url">
-                    <input type="submit" value="Fetch and analyze image">
+                    <button class="btn waves-effect waves-light" type="submit" name="action">
+                        Fetch     <i class="material-icons right">cloud_download</i>
+                    </button>
                 </form>
             </div>
             <div class="divider"></div>
@@ -77,6 +109,7 @@ def form(request):
         </html>
     """)
 
+
 @app.route("/upload", methods=["POST"])
 async def upload(request):
     data = await request.form()
@@ -94,24 +127,26 @@ def predict_image_from_bytes(bytes):
     img = my_open_image(BytesIO(bytes))
     normalized_img = my_normalize(img, np.array(imagenet_stats[0]), np.array(imagenet_stats[1]))
     numpy_input = normalized_img[None, ...]
-    resized_image = skimage.transform.rescale(numpy_input, [1, 1, 244/numpy_input.shape[2], 244/numpy_input.shape[3]])
+    resized_image = resize_image(numpy_input)
 
-    input_name = session.get_inputs()[0].name 
-    output_name = session.get_outputs()[0].name
-    results = session.run([output_name], {input_name: resized_image})
-    data_classes
+    input_name = models['pet'].session.get_inputs()[0].name 
+    output_name = models['pet'].session.get_outputs()[0].name
+    results = models['pet'].session.run([output_name], {input_name: resized_image})
     return JSONResponse({
-        'prediction': data_classes[np.argmax(results)],
-        'scores': sorted(zip(data_classes, map(float, results[0][0])),key=lambda p: p[1],reverse=True),
+        'prediction': models['pet'].classes[np.argmax(results)],
+        'scores': sorted(zip(models['pet'].classes, map(float, results[0][0])),key=lambda p: p[1],reverse=True),
     })
 
 
-async def get_bytes(url):
+async def get_bytes(url: str):
+    "asynchronously download bytes at url"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             return await response.read()
 
+
 def my_open_image(fn):
+    "open image and convert it to numpy array of float32, representing each pixel as 3 channels of 0.0 - 1.0 for RGB, based on fastai open_image"
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning) # EXIF warning from TiffPlugin
         x = PIL.Image.open(fn).convert('RGB')
@@ -123,5 +158,11 @@ def my_open_image(fn):
     x = x / 255
     return x
 
+
 def my_normalize(x, mean, std):
-  return ((x-mean[...,None,None]) / std[...,None,None]).astype(np.float32, copy=False)
+    "normalize data by subtracting mean and dividing by stddev"
+    return ((x-mean[...,None,None]) / std[...,None,None]).astype(np.float32, copy=False)
+
+
+def resize_image(numpy_input: np.array, rows = 224, cols = 224):
+    return skimage.transform.rescale(numpy_input, [1, 1, rows/numpy_input.shape[2], cols/numpy_input.shape[3]], multichannel=False)
