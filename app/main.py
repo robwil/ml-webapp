@@ -27,7 +27,7 @@ models = {
         ['Abyssinian', 'Bengal', 'Birman', 'Bombay', 'British_Shorthair', 'Egyptian_Mau', 'Maine_Coon', 'Persian', 'Ragdoll', 'Russian_Blue', 'Siamese', 'Sphynx', 'american_bulldog', 'american_pit_bull_terrier', 'basset_hound', 'beagle', 'boxer', 'chihuahua', 'english_cocker_spaniel', 'english_setter', 'finnish_lapphund', 'german_shorthaired', 'great_pyrenees', 'havanese', 'japanese_chin', 'keeshond', 'leonberger', 'miniature_pinscher', 'newfoundland', 'pomeranian', 'pug', 'saint_bernard', 'samoyed', 'scottish_terrier', 'shiba_inu', 'staffordshire_bull_terrier', 'wheaten_terrier', 'yorkshire_terrier']
     ),
     'flower': Model(
-        onnxruntime.InferenceSession("/app/models/pet.onnx"),
+        onnxruntime.InferenceSession("/app/models/flower.onnx"),
         ['Alpine Sea Holly', 'Anthurium', 'Artichoke', 'Azalea', 'Ball Moss', 'Balloon Flower', 'Barbeton Daisy', 'Bearded Iris', 'Bee Balm', 'Bird of Paradise', 'Bishop of Llandaff', 'Black-eyed Susan', 'Blackberry Lily', 'Blanket Flower', 'Bolero Deep Blue', 'Bougainvillea', 'Bromelia', 'Buttercup', 'Californian Poppy', 'Camellia', 'Canna Lily', 'Canterbury Bells', 'Cape Flower', 'Carnation', 'Cautleya Spicata', 'Clematis', "Colt's Foot", 'Columbine', 'Common Dandelion', 'Corn Poppy', 'Cyclamen', 'Daffodil', 'Desert-rose', 'English Marigold', 'Fire Lily (Glory Lily)', 'Foxglove', 'Frangipani', 'Fritillary', 'Garden Phlox', 'Gaura', 'Gazania', 'Geranium', 'Giant White Arum Lily', 'Globe Thistle', 'Globe-Flower', 'Grape Hyacinth', 'Great Masterwort', 'Hard-leaved Pocket Orchid', 'Hibiscus', 'Hippeastrum', 'Japanese Anemone', 'King Protea', 'Lenten Rose', 'Lotus', 'Love in the Mist', 'Magnolia', 'Mallow', 'Marigold', 'Mexican Aster', 'Mexican Petunia', 'Monkshood', 'Moon Orchid', 'Morning Glory', 'Orange Dahlia', 'Osteospermum', 'Oxeye Daisy', 'Passion Flower', 'Pelargonium', 'Peruvian Lily', 'Petunia', 'Pincushion Flower', 'Pink Primrose', 'Pink-yellow Dahlia', 'Poinsettia', 'Primula', "Prince of Wales' Feathers", 'Purple Coneflower', 'Red Ginger', 'Rose', 'Ruby-lipped Cattleya', 'Siam Tulip', 'Silverbush', 'Snapdragon', 'Spear Thistle', 'Spring Crocus', 'Stemless Gentian', 'Sunflower', 'Sweet Pea', 'Sweet William', 'Sword Lily', 'Thorn Apple', 'Tiger Lily', 'Toad Lily', 'Tree Mallow', 'Tree Poppy', 'Trumpet Creeper', 'Wallflower', 'Water Lily', 'Watercress', 'Wild Pansy', 'Windflower', 'Yellow Iris']
     )
 }
@@ -50,26 +50,39 @@ def form(request):
             </nav>
             <div class="section flow-text">
                 <form class="file-form" action="/upload" method="post" enctype="multipart/form-data">
+                    
+                    Which model to use?
+                    <p class="flow-text">
+                        <label>
+                            <input name="model" type="radio" value="pet" checked />
+                            <span>Cat/Dog Breeds</span>
+                        </label>
+                    </p>
+                    <p class="flow-text">
+                        <label>
+                            <input name="model" type="radio" value="flower" />
+                            <span>Flower Species</span>
+                        </label>
+                    </p>
+
                     Select image to upload:
-                        <div class="file-field input-field">
-                            <div class="btn">
-                                <span>File</span>
-                                <input type="file" name="file">
-                            </div>
-                            <div class="file-path-wrapper">
-                                <input class="file-path validate" type="text">
-                            </div>
+                    <div class="file-field input-field">
+                        <div class="btn">
+                            <span>File</span>
+                            <input type="file" name="file">
                         </div>
+                        <div class="file-path-wrapper">
+                            <input class="file-path validate" type="text">
+                        </div>
+                    </div>
+
+                    Or submit a URL:
+                    <input class="url-input" type="url" name="url">
+                    
                     <button class="btn waves-effect waves-light" type="submit" name="action">
-                        Upload     <i class="material-icons right">add_a_photo</i>
+                        Classify     <i class="material-icons right">tune</i>
                     </button>
-                </form>
-                Or submit a URL:
-                <form class="url-form" action="/classify-url" method="get">
-                    <input type="url" name="url">
-                    <button class="btn waves-effect waves-light" type="submit" name="action">
-                        Fetch     <i class="material-icons right">cloud_download</i>
-                    </button>
+
                 </form>
             </div>
             <div class="divider"></div>
@@ -86,22 +99,26 @@ def form(request):
                     }
                     out += "</table>";
                     $('.output').html(out);
+                    $('.btn').removeClass('disabled');
+                    $('.file-form').trigger('reset');
                 };
                 $('.file-form').submit(function() {
                     var formData = new FormData(this);
-                    $.ajax({
-                        url: $(this).attr('action'),
-                        type: $(this).attr('method'),
-                        data: formData,
-                        success: handleResponse,
-                        cache: false,
-                        contentType: false,
-                        processData: false
-                    });
-                    return false;
-                });
-                $('.url-form').submit(function() {
-                    $.get($(this).attr("action"), $(this).serialize(), handleResponse);
+                    if ($('.url-input').val().length > 0) {
+                        $.get('/classify-url', $(this).serialize(), handleResponse);
+                    } else {
+                        $.ajax({
+                            url: $(this).attr('action'),
+                            type: $(this).attr('method'),
+                            data: formData,
+                            success: handleResponse,
+                            cache: false,
+                            contentType: false,
+                            processData: false
+                        });
+                    }
+                    $('.output').html('<div class="progress"><div class="indeterminate"></div></div>')
+                    $('.btn').addClass('disabled');
                     return false;
                 });
             </script>
@@ -114,27 +131,28 @@ def form(request):
 async def upload(request):
     data = await request.form()
     bytes = await (data["file"].read())
-    return predict_image_from_bytes(bytes)
+    return predict_image_from_bytes(bytes, data["model"])
 
 
 @app.route("/classify-url", methods=["GET"])
 async def classify_url(request):
     bytes = await get_bytes(request.query_params["url"])
-    return predict_image_from_bytes(bytes)
+    return predict_image_from_bytes(bytes, request.query_params["model"])
 
 
-def predict_image_from_bytes(bytes):
+def predict_image_from_bytes(bytes, model_name: str):
     img = my_open_image(BytesIO(bytes))
     normalized_img = my_normalize(img, np.array(imagenet_stats[0]), np.array(imagenet_stats[1]))
     numpy_input = normalized_img[None, ...]
     resized_image = resize_image(numpy_input)
 
-    input_name = models['pet'].session.get_inputs()[0].name 
-    output_name = models['pet'].session.get_outputs()[0].name
-    results = models['pet'].session.run([output_name], {input_name: resized_image})
+    model = models[model_name]
+    input_name = model.session.get_inputs()[0].name 
+    output_name = model.session.get_outputs()[0].name
+    results = model.session.run([output_name], {input_name: resized_image})
     return JSONResponse({
-        'prediction': models['pet'].classes[np.argmax(results)],
-        'scores': sorted(zip(models['pet'].classes, map(float, results[0][0])),key=lambda p: p[1],reverse=True),
+        'prediction': model.classes[np.argmax(results)],
+        'scores': sorted(zip(model.classes, map(float, results[0][0])),key=lambda p: p[1],reverse=True),
     })
 
 
